@@ -1,1 +1,139 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
+local player = Players.LocalPlayer
+
+-- Only allow script to run if the player's username is "6cce5", "sagalanch", or "greenreiease"
+local allowedUsers = {
+    ["6cce5"] = true,
+    ["aaronrtx11"] = true,
+    ["greenreiease"] = true
+}
+
+if not allowedUsers[player.Name] then
+    return
+end
+
+-- Clone and rename goal
+for i, v in pairs(Workspace:GetDescendants()) do
+    if v.Name == "SHEESH" and v.Parent.Name == "Rim" then 
+        local original = v
+        local copy = original:Clone()
+        copy.Name = "ASMODM109"
+        copy.Parent = Workspace
+    end
+end
+
+local character = player.Character or player.CharacterAdded:Wait()
+local camera = Workspace.CurrentCamera
+local target = nil
+local connection
+local debounce = false
+
+-- Maintain a table of "ASMODM109" parts
+local goals = {}
+
+for _, part in pairs(Workspace:GetChildren()) do
+    if part.Name == "ASMODM109" then
+        table.insert(goals, part)
+    end
+end
+
+-- Disable only A/D movement (left/right)
+local function disableMovementInput()
+    local block = function()
+        return Enum.ContextActionResult.Sink
+    end
+    ContextActionService:BindAction("DisableMoveLeft", block, false, Enum.PlayerActions.CharacterLeft)
+    ContextActionService:BindAction("DisableMoveRight", block, false, Enum.PlayerActions.CharacterRight)
+end
+
+-- Re-enable all movement input
+local function enableMovementInput()
+    ContextActionService:UnbindAction("DisableMoveLeft")
+    ContextActionService:UnbindAction("DisableMoveRight")
+end
+
+-- Function to find the closest "Goal" part to the player's torso
+local function getClosestGoal()
+    if not character then return nil end
+    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+    if not torso then return nil end
+
+    local closestPart = nil
+    local shortestDistance = math.huge
+
+    for _, part in pairs(goals) do
+        local distance = (torso.Position - part.Position).Magnitude
+        if distance < shortestDistance then
+            shortestDistance = distance
+            closestPart = part
+        end
+    end
+
+    return closestPart
+end
+
+-- Update character reference when player respawns
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+end)
+
+-- Enable camlock with fixed Y-position
+local function enableCamlock()
+    if connection then connection:Disconnect() end
+
+    local fixedYOffset = 41
+    local initialCameraY = camera.CFrame.Position.Y
+
+    disableMovementInput()
+
+    connection = RunService.RenderStepped:Connect(function(deltaTime)
+        if target then
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then return end
+
+            local adjustedTargetPosition = target.Position + Vector3.new(0, fixedYOffset, 0)
+
+            local currentCameraPos = camera.CFrame.Position
+            local stableCameraPos = Vector3.new(currentCameraPos.X, initialCameraY, currentCameraPos.Z)
+
+            local newCFrame = CFrame.new(stableCameraPos, adjustedTargetPosition)
+            local lerpAlpha = 16 * deltaTime
+            camera.CFrame = camera.CFrame:Lerp(newCFrame, lerpAlpha)
+        end
+    end)
+end
+
+-- Disable camlock
+local function disableCamlock()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    enableMovementInput()
+end
+
+-- Toggle camlock on key press with debounce
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or debounce then return end
+    if input.KeyCode == Enum.KeyCode.F and character and character:FindFirstChild("Basketball") then
+        debounce = true
+        if target then
+            target = nil
+            disableCamlock()
+            debounce = false
+        else
+            target = getClosestGoal()
+            enableCamlock()
+
+            task.wait(0.50)
+            target = nil
+            disableCamlock()
+            debounce = false
+        end
+    end
+end)
